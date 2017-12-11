@@ -1,20 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/sem.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
-
-#define KEY 111
+#include "header.h"
 
 void create_sem();
 void view();
 void remove_sem();
-
-typedef sem_t Semaphore;
 
 int main(int argc, char const *argv[]) {
   if (argv[1] != NULL) {
@@ -35,63 +23,55 @@ int main(int argc, char const *argv[]) {
 
 void create_sem() {
   int sid;
-  sid = semget(KEY, 1, IPC_CREAT | IPC_EXCL | 0664);
+  sid = semget(SEM_KEY, 1, IPC_CREAT | IPC_EXCL | 0664);
   if (sid > 0) {
-    semctl(sid, 0, SETVAL, 0);
-    printf("Creating new semaphore:\n");
+    printf("Creating new semaphore...\n");
     printf("\t[id]: %d\n", sid);
-    printf("Creating a new file\n");
-    int f = open("file.txt", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    union semun su;
+    su.val = 1;
+    su.val = semctl(sid, 0, SETVAL, su);
+
+    sid = shmget(SHM_KEY, sizeof(int), IPC_CREAT | 0644);
+    printf("Creating a new file...\n");
+    int f = open("story.txt", O_CREAT | O_WRONLY | O_TRUNC, 0644);
   } else {
-    sid = semget(KEY, 1, IPC_CREAT);
+    sid = semget(SEM_KEY, 1, IPC_CREAT);
     printf("Error: Semaphore already exists:\n");
     printf("\t[id]: %d\n", sid);
   }
 }
 
-void view() {
-  FILE *file = fopen("file.txt", "rw");
-  char str[1000];
-  if (file) {
-    fscanf(file, "%[^\n]", str);
+char * get_story() {
+  int fd;
+  struct stat story;
+  stat("story.txt", &story);
+  fd = open("story.txt", O_RDONLY);
+  if (fd) {
+    int size = story.st_size;
+    char * s = malloc(size);
+    read(fd, s, size);
+    return s;
+  } else {
+    printf("\nError: Story does not exist\n\n");
+    exit(1);
   }
-  printf("Story: \n%s\n", str);
-  fclose(file);
 }
 
-void addTo(char* str){
-  FILE *file = fopen("file.txt", "w");
-  fprintf(file, "%s\n", str);
-  fclose(file);
-}
-
-void semaphore_wait(Semaphore *sem)
-{
-  int n = sem_wait(sem);
-  if (n != 0) perror_exit("sem_wait failed");
-}
-
-void semaphore_signal(Semaphore *sem)
-{
-  int n = sem_post(sem);
-  if (n != 0) perror_exit("sem_post failed");
+void view() {
+  char * story = get_story();
+  printf("\nSTORY:\n\n%s\n", story);
+  free(story);
 }
 
 void remove_sem() {
   int sid, val;
-  sid = semget(KEY, 1, 0664);
+  sid = semget(SEM_KEY, 1, 0664);
   if (sid != -1) {
-    printf("Deleting semaphore\n");
-    FILE *file = fopen("file.txt", "rw");
-    char str[1000];
-    if (file) {
-      fscanf(file, "%[^\n]", str);
-    }
-    printf("Story: \n%s\n", str);
-    fclose(file);
-    remove("file.txt");
+    printf("Deleting semaphore...\n");
+    view();
+    remove("story.txt");
     semctl(sid, 0, IPC_RMID);
   } else {
-    printf("Error: No semaphore found\n\n");
+    printf("Error: Semaphore does not exist\n\n");
   }
 }
