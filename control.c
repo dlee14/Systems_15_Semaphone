@@ -14,6 +14,8 @@ void create_sem();
 void view();
 void remove_sem();
 
+typedef sem_t Semaphore;
+
 int main(int argc, char const *argv[]) {
   if (argv[1] != NULL) {
     if (!strcmp(argv[1], "-c")) {
@@ -55,6 +57,24 @@ void view() {
   }
   printf("Story: \n%s\n", str);
   fclose(file);
+}
+
+void addTo(char* str){
+  FILE *file = fopen("file.txt", "w");
+  fprintf(file, "%s\n", str);
+  fclose(file);
+}
+
+void semaphore_wait(Semaphore *sem)
+{
+  int n = sem_wait(sem);
+  if (n != 0) perror_exit("sem_wait failed");
+}
+
+void semaphore_signal(Semaphore *sem)
+{
+  int n = sem_post(sem);
+  if (n != 0) perror_exit("sem_post failed");
 }
 
 void remove_sem() {
